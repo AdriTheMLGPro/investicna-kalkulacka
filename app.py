@@ -1,6 +1,7 @@
 import streamlit as st
 import pandas as pd
 
+
 def simuluj_investovanie_profesional(
         vklad_suma, periodicita, rocny_vynos_p, ter_p,
         spravca_p, vstupny_poplatok_p, transakcny_poplatok_p,
@@ -72,7 +73,21 @@ def simuluj_investovanie_profesional(
     return (round(celkovo_vlozene, 2), round(hodnota_uctu, 2),
             round(vstupny_poplatok_celkovo, 2), round(celkovo_zaplatene_transakcne, 2), rocna_historia)
 
-st.set_page_config(page_title="Investičná Kalkulačka", layout="wide")
+
+st.set_page_config(
+    page_title="Investičná Kalkulačka",
+    page_icon="📈",
+    layout="wide"
+)
+
+hide_st_style = """
+            <style>
+            #MainMenu {visibility: hidden;}
+            footer {visibility: hidden;}
+            header {visibility: hidden;}
+            </style>
+            """
+st.markdown(hide_st_style, unsafe_allow_html=True)
 
 st.title("📈 Profesionálna Investičná Kalkulačka")
 st.markdown("Porovnanie pridanej hodnoty makléra (vedenie, disciplína, správa) verzus investovanie na vlastnú päsť.")
