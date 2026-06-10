@@ -1,9 +1,6 @@
 import streamlit as st
 import pandas as pd
 
-# ==========================================
-# MATEMATICKÉ JADRO (Nezmenené)
-# ==========================================
 def simuluj_investovanie_profesional(
         vklad_suma, periodicita, rocny_vynos_p, ter_p,
         spravca_p, vstupny_poplatok_p, transakcny_poplatok_p,
@@ -23,7 +20,7 @@ def simuluj_investovanie_profesional(
     vstupny_poplatok_celkovo = cielova_suma * (vstupny_poplatok_p / 100)
 
     cisty_rocny_vynos = rocny_vynos_p - ter_p
-    cisty_denny_rast = (1 + cisty_rocny_vynos / 100) ** (1 / 365)
+    cisty_denny_rast = (1 + cisty_rocny_vynos / 100) ** (1 / 365) if cisty_rocny_vynos > 0 else 1.0
 
     hodnota_uctu = 0.0
     celkovo_vlozene = 0.0
@@ -47,7 +44,21 @@ def simuluj_investovanie_profesional(
         hodnota_uctu *= cisty_denny_rast
 
         if spravca_p > 0:
-            aktualna_sadzba_spravcu = 0.5 if hodnota_uctu >= 500000 else spravca_p
+            if hodnota_uctu < 50000:
+                aktualna_sadzba_spravcu = spravca_p
+            elif 50000 <= hodnota_uctu < 100000:
+                aktualna_sadzba_spravcu = 0.75
+            elif 100000 <= hodnota_uctu < 200000:
+                aktualna_sadzba_spravcu = 0.70
+            elif 200000 <= hodnota_uctu < 300000:
+                aktualna_sadzba_spravcu = 0.65
+            elif 300000 <= hodnota_uctu < 400000:
+                aktualna_sadzba_spravcu = 0.60
+            elif 400000 <= hodnota_uctu < 500000:
+                aktualna_sadzba_spravcu = 0.55
+            else:
+                aktualna_sadzba_spravcu = 0.50
+
             denny_poplatok_spravcu = (1 + aktualna_sadzba_spravcu / 100) ** (1 / 365) - 1
             hodnota_uctu -= (hodnota_uctu * denny_poplatok_spravcu)
 
@@ -61,15 +72,19 @@ def simuluj_investovanie_profesional(
     return (round(celkovo_vlozene, 2), round(hodnota_uctu, 2),
             round(vstupny_poplatok_celkovo, 2), round(celkovo_zaplatene_transakcne, 2), rocna_historia)
 
-# ==========================================
-# INTERAKTÍVNE UI (Streamlit)
-# ==========================================
 st.set_page_config(page_title="Investičná Kalkulačka", layout="wide")
 
-st.title("📈 Interaktívna Investičná Kalkulačka")
-st.markdown("Porovnanie nákladov sprostredkovateľa verzus samostatné investovanie cez brokera s nulovými poplatkami.")
+st.title("📈 Profesionálna Investičná Kalkulačka")
+st.markdown("Porovnanie pridanej hodnoty makléra (vedenie, disciplína, správa) verzus investovanie na vlastnú päsť.")
 
-# --- VSTUPNÉ PARAMETRE (Umiestnené dole pod grafom pomocou kontajnerov) ---
+st.write("---")
+scenar = st.radio(
+    "**Vyberte úroveň skúseností klienta (scenár pre prezentáciu):**",
+    options=["Neskúsený investor (Bežný človek bez vedenia – robí emočné chyby, stráca -3% p.a.)",
+             "Profesionálny / Skúsený investor (Dokáže sám plne replikovať trh s 0% chybovosťou)"],
+    index=0
+)
+
 st.write("---")
 st.subheader("⚙️ Nastavenie parametrov")
 
@@ -77,7 +92,7 @@ col1, col2, col3 = st.columns(3)
 
 with col1:
     vklad_suma = st.number_input("Pravidelný vklad (€)", min_value=10.0, value=100.0, step=10.0)
-    periodicita = st.selectbox("Periodicita", options=["mesacne", "tyzdenne", "rocne"])
+    periodicita = st.selectbox("Periodicita vkladov", options=["mesacne", "tyzdenne", "rocne"])
     roky = st.slider("Dĺžka investovania (roky)", min_value=1, max_value=50, value=40)
 
 with col2:
@@ -85,61 +100,97 @@ with col2:
     ter_p = st.number_input("TER fondu (%)", value=0.2048, step=0.0001, format="%.4f")
 
 with col3:
-    st.markdown("**Poplatky sprostredkovateľa:**")
-    spravca_p = st.number_input("Ročný poplatok Prosight (%)", value=1.0, step=0.1)
-    vstupny_poplatok_p = st.number_input("Vstupný poplatok z cieľovej sumy (%)", value=3.0, step=0.5)
-    poplatok_spolocnosti_p = st.number_input("Poplatok správcovskej spoločnosti (eic) (%)", value=0.2, step=0.1)
+    st.markdown("**Poplatky správcu & Sprostredkovateľa:**")
+    spravca_p = st.number_input("Základný ročný poplatok správcu (%)", value=1.0, step=0.1)
+    vstupny_poplatok_p = st.number_input("Vstupný poplatok z cieľovej sumy (%)", value=1.0, step=0.5)
+    poplatok_spolocnosti_p = st.number_input("Poplatok správcovskej spoločnosti (%)", value=0.2, step=0.1)
 
-# --- SPRACOVANIE DÁT ---
-# 1. Sprostredkovateľ
+if "Neskúsený investor" in scenar:
+    vynos_makler = rocny_vynos_p
+    vynos_broker = rocny_vynos_p - 3.0
+    st.info(
+        f"💡 **Prezentačný modus:** Maklér udržiava disciplínu klienta na plnom výnose trhu ({vynos_makler}%). Samostatný investor na vlastnú päsť kvôli chybám v časovaní a emóciám dosahuje výnos iba {vynos_broker}%.")
+else:
+    vynos_makler = rocny_vynos_p
+    vynos_broker = rocny_vynos_p
+    st.success(
+        f"📈 **Profesionálny modus:** Obe strategie dosahujú plný trhový výnos {rocny_vynos_p}%. Graf ukazuje čistý vplyv poplatkových štruktúr.")
+
 vlozene_1, vysledok_1, fee_vstup_1, fee_tx_1, hist_1 = simuluj_investovanie_profesional(
-    vklad_suma, periodicita, rocny_vynos_p, ter_p, spravca_p, vstupny_poplatok_p, 0.2, poplatok_spolocnosti_p, roky
+    vklad_suma, periodicita, vynos_makler, ter_p, spravca_p, vstupny_poplatok_p, 0.2, poplatok_spolocnosti_p, roky
 )
 
-# 2. Samostatný investor
 vlozene_2, vysledok_2, fee_vstup_2, fee_tx_2, hist_2 = simuluj_investovanie_profesional(
-    vklad_suma, periodicita, rocny_vynos_p, ter_p, 0.0, 0.0, 0.0, 0.0, roky
+    vklad_suma, periodicita, vynos_broker, ter_p, 0.0, 0.0, 0.0, 0.0, roky
 )
 
-# Príprava dát do tabuľky pre interaktívny graf
-df1 = pd.DataFrame(hist_1, columns=['Rok', 'Vložené spolu', 'S poplatkami'])
-df2 = pd.DataFrame(hist_2, columns=['Rok', 'Vložené spolu 2', 'Čisté ETF (0%)'])
+df1 = pd.DataFrame(hist_1, columns=['Rok', 'Vložené spolu', 'S maklérom (S poplatkami)'])
+df2 = pd.DataFrame(hist_2, columns=['Rok', 'Vložené spolu 2', 'Na vlastnú päsť (0% poplatky)'])
 
-# Spojenie do jednej tabuľky
-df_graf = pd.merge(df1, df2[['Rok', 'Čisté ETF (0%)']], on='Rok')
+df_graf = pd.merge(df1, df2[['Rok', 'Na vlastnú päsť (0% poplatky)']], on='Rok')
 df_graf.set_index('Rok', inplace=True)
 
-# --- VYKRESLENIE GRAFU ---
 st.write("---")
 st.subheader("📊 Vývoj majetku v čase")
-# Vykreslenie interaktívneho čiarového grafu z 3 stĺpcov
-st.line_chart(df_graf[['Vložené spolu', 'S poplatkami', 'Čisté ETF (0%)']], height=400)
+st.line_chart(df_graf[['Vložené spolu', 'S maklérom (S poplatkami)', 'Na vlastnú päsť (0% poplatky)']], height=450)
 
-# --- VÝPOČTY PRE FINÁLNY REPORT ---
-rozdiel_zostatkov = vysledok_2 - vysledok_1
-celkova_strata = rozdiel_zostatkov + fee_vstup_1
-denny_naklad = celkova_strata / (roky * 365)
 poplatok_odpredaj_1 = vysledok_1 * 0.002
 cisty_vysledok_po_odpredaji_1 = vysledok_1 - poplatok_odpredaj_1
 
-# --- FINÁLNE VÝSLEDKY A ČÍSLA ---
 st.write("---")
 st.subheader("💰 Finančný sumár")
 
 col_res1, col_res2, col_res3 = st.columns(3)
 
-col_res1.metric(label="Konečný zostatok (Čisté ETF)", value=f"{vysledok_2:,.2f} €".replace(",", " "))
-col_res2.metric(label="Konečný zostatok (Sprostredkovateľ)", value=f"{vysledok_1:,.2f} €".replace(",", " "))
-col_res3.metric(label="CELKOVÁ STRATA (Rozdiel + Poplatky)", value=f"- {celkova_strata:,.2f} €".replace(",", " "), delta_color="inverse")
+col_res1.metric(label="Konečný stav s Maklérom", value=f"{vysledok_1:,.2f} €".replace(",", " "))
+col_res2.metric(label="Konečný stav na vlastnú päsť", value=f"{vysledok_2:,.2f} €".replace(",", " "))
 
-st.markdown("### Detail poplatkov a strát (Stratégia so sprostredkovateľom)")
-st.text(f"""
-Jednorazový vstupný poplatok (zaplatený pomimo):       {fee_vstup_1:,.2f} €
-Celkové transakčné poplatky pri nákupe (0.2%):         {fee_tx_1:,.2f} €
-Strata na samotnom zostatku (ušlý zisk + poplatky):    {rozdiel_zostatkov:,.2f} €
--------------------------------------------------------------------------
-Priemerný denný náklad na sprostredkovateľa:           {denny_naklad:,.2f} € / deň
--------------------------------------------------------------------------
-Poplatok za finálny odpredaj majetku (0.2%):           {poplatok_odpredaj_1:,.2f} €
-Čistá vyplatená suma po záverečnom odpredaji:          {cisty_vysledok_po_odpredaji_1:,.2f} €
-""")
+if vysledok_1 > vysledok_2:
+    cisty_zisk_z_maklera = vysledok_1 - vysledok_2
+    col_res3.metric(
+        label="PRIDANÁ HODNOTA MAKLÉRA",
+        value=f"+ {cisty_zisk_z_maklera:,.2f} €".replace(",", " "),
+        delta="Maklér zarobil klientovi viac"
+    )
+else:
+    cisty_rozdiel_poplatkov = vysledok_2 - vysledok_1
+    celkova_strata_s_poplatkami = cisty_rozdiel_poplatkov + fee_vstup_1
+    col_res3.metric(
+        label="Rozdiel v prospech čistého ETF",
+        value=f"- {celkova_strata_s_poplatkami:,.2f} €".replace(",", " "),
+        delta_color="inverse",
+        delta="Čisté ETF bez poplatkov vedie"
+    )
+
+st.markdown("### 📋 Detailný rozbor stratégie")
+col_info1, col_info2 = st.columns(2)
+
+with col_info1:
+    st.markdown("**Prehľad vkladov a poplatkov:**")
+    st.text(f"""Celkovo vložený kapitál (vlastné vklady):   {vlozene_1:,.2f} €
+-----------------------------------------------------------------
+Vstupný poplatok (vypočítaný pomimo):        {fee_vstup_1:,.2f} €
+Transakčné poplatky pri nákupoch (0.2%):       {fee_tx_1:,.2f} €
+Poplatok za finálny odpredaj majetku (0.2%):    {poplatok_odpredaj_1:,.2f} €
+-----------------------------------------------------------------
+Čistá vyplatená suma klientovi na ruku:         {cisty_vysledok_po_odpredaji_1:,.2f} €""")
+
+with col_info2:
+    st.markdown("**Zhodnotenie pre prezentáciu:**")
+    if "Neskúsený investor" in scenar:
+        st.markdown(f"""
+        🔴 **Sám sebe nepriateľom:** Ak by si tento klient riešil investovanie sám, kvôli chybám v správaní a emóciám by skončil s majetkom **{vysledok_2:,.2f} €**.
+
+        🟢 **Sila odborného poradenstva:** S maklérom má síce poplatky (ktoré sa s rastom majetku automaticky znižujú až na 0,5%), ale vďaka stopercentnej disciplíne a plnému výnosu odchádza s majetkom **{vysledok_1:,.2f} €**.
+
+        🔥 **Výsledok:** Služba makléra priniesla klientovi čistý majetok vyšší o **{(vysledok_1 - vysledok_2):,.2f} €**, čím poplatky kompletne stratili na váhe a premenili sa na najlepšiu investíciu do disciplíny.
+        """)
+    else:
+        rozdiel_zostatkov = vysledok_2 - vysledok_1
+        celkova_strata = rozdiel_zostatkov + fee_vstup_1
+        denny_naklad = celkova_strata / (roky * 365)
+        st.markdown(f"""
+        💼 **Pre skúseného profesionála:** Tento scenár potvrdzuje, že pokiaľ je investor dokonale disciplinovaný a nedopúšťa sa chýb, poplatková štruktúra vrátane klesajúcej škály ho v priebehu {roky} rokov stojí **{celkova_strata:,.2f} €** na ušlom zisku a poplatkoch.
+
+        ⏱️ **Denný náklad:** Poplatky a ušlý zisk predstavujú priemerný náklad **{denny_naklad:,.2f} € / deň** za kompletnú správu portfólia.
+        """)
